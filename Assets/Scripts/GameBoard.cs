@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using TMPro;
 using UnityEngine;
 
 public class GameBoard : MonoBehaviour
@@ -13,26 +14,60 @@ public class GameBoard : MonoBehaviour
     [SerializeField] private Sprite[] FruitsList;
     [SerializeField] private Vector2Int[] DisablePositions;
 
-    public static GameBoard Instance;
+    [SerializeField] private int StartingMove;
+    [SerializeField] private TextMeshProUGUI MovesText;
+    [SerializeField] private TextMeshProUGUI ScoreText;
+    [SerializeField] private GameObject GameOverMenu;
+
+    public static GameBoard Instance { get; private set; }
     private Tile[,] Grid;
     private Bounds BoardBounds;
     private Bounds FruitsBounds;
 
-    // Start is called before the first frame update
-    void Awake()
+    private int _score;
+    public int Score
+    {
+        get { return _score; }
+        set
+        {
+            _score = value;
+            ScoreText.text = _score.ToString();
+        }
+    }
+
+    private int _numMoves;
+    public int NumMoves
+    {
+        get { return _numMoves; }
+        set
+        {
+            _numMoves = value;
+            MovesText.text = _numMoves.ToString();
+        }
+    }
+
+    private void Awake()
     {
         Instance = this;
 
         BoardBounds = BoardTemplate.GetComponent<SpriteRenderer>().bounds;
         FruitsBounds = TileTemplate.GetComponentInChildren<SpriteRenderer>().bounds;
-        Grid = new Tile[Columns, Rows];
 
-        CreateBoard();
+        Score = 0;
+        NumMoves = StartingMove;
+    }
+
+    private void Start()
+    {
+        Grid = new Tile[Columns, Rows];
+        GameOverMenu.SetActive(false);
+
+        InitGrid();
     }
 
     #region Create
 
-    void CreateBoard()
+    void InitGrid()
     {
         Vector2 startPosition = BoardBounds.min + new Vector3(Padding.x, Padding.y, 0f);
         Vector2 position = startPosition;
@@ -69,7 +104,7 @@ public class GameBoard : MonoBehaviour
     
     #endregion
 
-    #region Public
+    #region Game Logic
 
     public void SwapTile(Vector2Int lhs, Vector2Int rhs)
     {
@@ -90,16 +125,24 @@ public class GameBoard : MonoBehaviour
         }
         else
         {
+            --NumMoves;
+
             do
             {
                 FillHoles();
             } while (CheckMatches());
+
+            if (NumMoves <= 0)
+            {
+                NumMoves = 0;
+                GameOver();
+            }
         }
     }
 
     public bool CheckMatches()
     {
-        HashSet<Tile> matchTiles = new HashSet<Tile>();
+        HashSet<Tile> matchedTiles = new HashSet<Tile>();
 
         for (int row = 0; row < Rows; row++)
         {
@@ -114,25 +157,27 @@ public class GameBoard : MonoBehaviour
                 List<Tile> horizontalMatches = FindColumnMatchForTile(row, column, currentTile);
                 if (horizontalMatches.Count >= 2)
                 {
-                    matchTiles.UnionWith(horizontalMatches);
-                    matchTiles.Add(currentTile);
+                    matchedTiles.UnionWith(horizontalMatches);
+                    matchedTiles.Add(currentTile);
                 }
 
                 List<Tile> verticalMatches = FindRowMatchForTile(row, column, currentTile);
                 if (verticalMatches.Count >= 2)
                 {
-                    matchTiles.UnionWith(verticalMatches);
-                    matchTiles.Add(currentTile);
+                    matchedTiles.UnionWith(verticalMatches);
+                    matchedTiles.Add(currentTile);
                 }
             }
         }
 
-        foreach (Tile tile in matchTiles)
+        foreach (Tile tile in matchedTiles)
         {
             tile.Renderer.sprite = null;
         }
 
-        return matchTiles.Count > 0;
+        Score += matchedTiles.Count;
+
+        return matchedTiles.Count > 0;
     }
 
     void FillHoles()
@@ -167,6 +212,13 @@ public class GameBoard : MonoBehaviour
                 }
             }
         }
+    }
+
+    void GameOver()
+    {
+        Debug.Log("GAME OVER");
+        PlayerPrefs.SetInt("score", Score);
+        GameOverMenu.SetActive(true);
     }
 
     SpriteRenderer GetSpriteRendererAt(int column, int row)
