@@ -100,6 +100,7 @@ public class GameBoard : MonoBehaviour
         Tile newTile = Instantiate(element.Prefab, position, Quaternion.identity, transform).GetComponent<Tile>();
         newTile.TileType = type;
         newTile.Position = coordinate;
+        newTile.MovePosition = position;
         columns.Add(newTile);
     }
 
@@ -112,14 +113,19 @@ public class GameBoard : MonoBehaviour
         Tile tile1 = Rows[lhs.y][lhs.x];
         Tile tile2 = Rows[rhs.y][rhs.x];
 
+        if (tile1.InProgress || tile2.InProgress)
+        {
+            return;
+        }
+
         Vector2 temp = tile1.transform.position;
         Vector2Int positionTemp = tile1.Position;
 
         tile1.Position = tile2.Position;
-        tile1.transform.position = tile2.transform.position;
+        tile1.MovePosition = tile2.transform.position;
 
         tile2.Position = positionTemp;
-        tile2.transform.position = temp;
+        tile2.MovePosition = temp;
 
         Rows[lhs.y][lhs.x] = tile2;
         Rows[rhs.y][rhs.x] = tile1;
