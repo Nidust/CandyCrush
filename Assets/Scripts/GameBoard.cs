@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -30,65 +29,51 @@ public class GameBoard : MonoBehaviour
     [SerializeField] private GameObject BoardTemplate;
     [SerializeField] private GameObject FruitsTemplate;
     [SerializeField] private GameBoardElement[] ElementsEachType;
+    [SerializeField] private Vector2Int[] DisablePositions;
 
-    private List<List<BoardType>> Elements;
+    public static GameBoard Instance;
+    private List<List<Tile>> Rows;
     private Bounds BoardBounds;
     private Bounds FruitsBounds;
 
     // Start is called before the first frame update
-    void Start()
+    void Awake()
     {
+        Instance = this;
+
         BoardBounds = BoardTemplate.GetComponent<SpriteRenderer>().bounds;
         FruitsBounds = FruitsTemplate.GetComponentInChildren<SpriteRenderer>().bounds;
 
         CreateBoard();
-        CreateBoardElements();
     }
+
+    #region Create
 
     void CreateBoard()
-    {
-        Elements = new List<List<BoardType>>();
-
-        for (int y = 0; y < Size.y; y++)
-        {
-            List<BoardType> rows = new List<BoardType>();
-
-            for (int x = 0; x < Size.x; x++)
-            {
-                rows.Add(BoardType.Apple);
-            }
-
-            Elements.Add(rows);
-        }
-    }
-
-    void CreateBoardElements()
     {
         Vector2 startPosition = BoardBounds.min + new Vector3(Padding.x, Padding.y, 0f);
         Vector2 position = startPosition;
 
+        System.Array enumArr = System.Enum.GetValues(typeof(BoardType));
+
+        Rows = new List<List<Tile>>();
+
         for (int y = 0; y < Size.y; y++)
         {
+            List<Tile> cols = new List<Tile>();
+            Rows.Add(cols);
+
             for (int x = 0; x < Size.x; x++)
             {
-                BoardType type = Elements[y][x];
-                if (type == BoardType.None)
+                Vector2Int coordinate = new Vector2Int(x, y);
+                if (DisablePositions.Contains(coordinate))
                 {
-                    continue;
+                    cols.Add(null);
                 }
-
-                GameBoardElement element = ElementsEachType.SingleOrDefault(x => x.Type == type);
-                if (element == null)
+                else
                 {
-                    continue;
+                    CreateRandomTile(cols, enumArr, position, coordinate);
                 }
-
-                Instantiate(
-                    original: element.Prefab,
-                    position: position,
-                    rotation: Quaternion.identity,
-                    parent: transform
-                );
 
                 position.x += FruitsBounds.extents.x + Margin.x;
             }
@@ -98,6 +83,50 @@ public class GameBoard : MonoBehaviour
         }
     }
 
+    void CreateRandomTile(List<Tile> columns, System.Array enumArr, Vector2 position, Vector2Int coordinate)
+    {
+        BoardType type = (BoardType)enumArr.GetValue(Random.Range(1, enumArr.Length));
+        if (type == BoardType.None)
+        {
+            return;
+        }
+
+        GameBoardElement element = ElementsEachType.SingleOrDefault(x => x.Type == type);
+        if (element == null)
+        {
+            return;
+        }
+
+        Tile newTile = Instantiate(element.Prefab, position, Quaternion.identity, transform).GetComponent<Tile>();
+        newTile.TileType = type;
+        newTile.Position = coordinate;
+        columns.Add(newTile);
+    }
+
+    #endregion
+
+    #region Public
+
+    public void SwapTile(Vector2Int lhs, Vector2Int rhs)
+    {
+        Tile tile1 = Rows[lhs.y][lhs.x];
+        Tile tile2 = Rows[rhs.y][rhs.x];
+
+        Vector2 temp = tile1.transform.position;
+        Vector2Int positionTemp = tile1.Position;
+
+        tile1.Position = tile2.Position;
+        tile1.transform.position = tile2.transform.position;
+
+        tile2.Position = positionTemp;
+        tile2.transform.position = temp;
+
+        Rows[lhs.y][lhs.x] = tile2;
+        Rows[rhs.y][rhs.x] = tile1;
+    }
+    #endregion
+
+    #region Debug
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = new Color(1.0f, 0.0f, 0.0f, 0.5f);
@@ -114,18 +143,6 @@ public class GameBoard : MonoBehaviour
         {
             for (int x = 0; x < Size.x; x++)
             {
-                BoardType type = Elements[y][x];
-                if (type == BoardType.None)
-                {
-                    continue;
-                }
-
-                GameBoardElement element = ElementsEachType.SingleOrDefault(x => x.Type == type);
-                if (element == null)
-                {
-                    continue;
-                }
-
                 Gizmos.DrawWireCube(position, FruitsBounds.size);
 
                 position.x += FruitsBounds.extents.x + Margin.x;
@@ -135,4 +152,5 @@ public class GameBoard : MonoBehaviour
             position.y += FruitsBounds.extents.y + Margin.y;
         }
     }
+    #endregion
 }

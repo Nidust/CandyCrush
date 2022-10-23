@@ -3528,9 +3528,45 @@ PrefabInstance:
       value: Fruits
       objectReference: {fileID: 0}
     - target: {fileID: 7196761076451610684, guid: de33b5a0333f3d347ac68f0baadafa25, type: 3}
+      propertyPath: Size.x
+      value: 8
+      objectReference: {fileID: 0}
+    - target: {fileID: 7196761076451610684, guid: de33b5a0333f3d347ac68f0baadafa25, type: 3}
+      propertyPath: Size.y
+      value: 8
+      objectReference: {fileID: 0}
+    - target: {fileID: 7196761076451610684, guid: de33b5a0333f3d347ac68f0baadafa25, type: 3}
       propertyPath: BoardTemplate
       value: 
       objectReference: {fileID: 457611751}
+    - target: {fileID: 7196761076451610684, guid: de33b5a0333f3d347ac68f0baadafa25, type: 3}
+      propertyPath: DisablePositions.Array.size
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 7196761076451610684, guid: de33b5a0333f3d347ac68f0baadafa25, type: 3}
+      propertyPath: DisablePositions.Array.data[1].x
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 7196761076451610684, guid: de33b5a0333f3d347ac68f0baadafa25, type: 3}
+      propertyPath: DisablePositions.Array.data[1].y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7196761076451610684, guid: de33b5a0333f3d347ac68f0baadafa25, type: 3}
+      propertyPath: DisablePositions.Array.data[2].x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7196761076451610684, guid: de33b5a0333f3d347ac68f0baadafa25, type: 3}
+      propertyPath: DisablePositions.Array.data[2].y
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 7196761076451610684, guid: de33b5a0333f3d347ac68f0baadafa25, type: 3}
+      propertyPath: DisablePositions.Array.data[3].x
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 7196761076451610684, guid: de33b5a0333f3d347ac68f0baadafa25, type: 3}
+      propertyPath: DisablePositions.Array.data[3].y
+      value: 7
+      objectReference: {fileID: 0}
     - target: {fileID: 7196761076451610685, guid: de33b5a0333f3d347ac68f0baadafa25, type: 3}
       propertyPath: m_RootOrder
       value: 1
