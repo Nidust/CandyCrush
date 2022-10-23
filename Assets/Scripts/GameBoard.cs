@@ -2,37 +2,19 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-public enum BoardType
-{
-    None,
-    Apple,
-    Banana,
-    Blueberry,
-    Grapes,
-    Orange,
-    Pear,
-    Strawberry
-}
-
-[System.Serializable]
-public class GameBoardElement
-{
-    public BoardType Type;
-    public GameObject Prefab;
-}
-
 public class GameBoard : MonoBehaviour
 {
-    [SerializeField] private Vector2 Size;
+    [SerializeField] private int Rows;
+    [SerializeField] private int Columns;
     [SerializeField] private Vector2 Margin;
     [SerializeField] private Vector2 Padding;
     [SerializeField] private GameObject BoardTemplate;
-    [SerializeField] private GameObject FruitsTemplate;
-    [SerializeField] private GameBoardElement[] ElementsEachType;
+    [SerializeField] private GameObject TileTemplate;
+    [SerializeField] private Sprite[] FruitsList;
     [SerializeField] private Vector2Int[] DisablePositions;
 
     public static GameBoard Instance;
-    private List<List<Tile>> Rows;
+    private Tile[,] Grid;
     private Bounds BoardBounds;
     private Bounds FruitsBounds;
 
@@ -42,7 +24,8 @@ public class GameBoard : MonoBehaviour
         Instance = this;
 
         BoardBounds = BoardTemplate.GetComponent<SpriteRenderer>().bounds;
-        FruitsBounds = FruitsTemplate.GetComponentInChildren<SpriteRenderer>().bounds;
+        FruitsBounds = TileTemplate.GetComponentInChildren<SpriteRenderer>().bounds;
+        Grid = new Tile[Columns, Rows];
 
         CreateBoard();
     }
@@ -54,25 +37,26 @@ public class GameBoard : MonoBehaviour
         Vector2 startPosition = BoardBounds.min + new Vector3(Padding.x, Padding.y, 0f);
         Vector2 position = startPosition;
 
-        System.Array enumArr = System.Enum.GetValues(typeof(BoardType));
-
-        Rows = new List<List<Tile>>();
-
-        for (int y = 0; y < Size.y; y++)
+        for (int row = 0; row < Rows; row++)
         {
-            List<Tile> cols = new List<Tile>();
-            Rows.Add(cols);
-
-            for (int x = 0; x < Size.x; x++)
+            for (int column = 0; column < Columns; column++)
             {
-                Vector2Int coordinate = new Vector2Int(x, y);
+                Vector2Int coordinate = new Vector2Int(column, row);
                 if (DisablePositions.Contains(coordinate))
                 {
-                    cols.Add(null);
+                    Grid[column, row] = null;
                 }
                 else
                 {
-                    CreateRandomTile(cols, enumArr, position, coordinate);
+                    GameObject newTile = Instantiate(TileTemplate, position, Quaternion.identity, transform);
+
+                    SpriteRenderer renderer = newTile.GetComponentInChildren<SpriteRenderer>();
+                    renderer.sprite = FruitsList[Random.Range(0, FruitsList.Length)];
+
+                    Tile tile = newTile.GetComponent<Tile>();
+                    tile.Position = new Vector2Int(column, row);
+
+                    Grid[column, row] = tile;
                 }
 
                 position.x += FruitsBounds.extents.x + Margin.x;
@@ -82,53 +66,165 @@ public class GameBoard : MonoBehaviour
             position.y += FruitsBounds.extents.y + Margin.y;
         }
     }
-
-    void CreateRandomTile(List<Tile> columns, System.Array enumArr, Vector2 position, Vector2Int coordinate)
-    {
-        BoardType type = (BoardType)enumArr.GetValue(Random.Range(1, enumArr.Length));
-        if (type == BoardType.None)
-        {
-            return;
-        }
-
-        GameBoardElement element = ElementsEachType.SingleOrDefault(x => x.Type == type);
-        if (element == null)
-        {
-            return;
-        }
-
-        Tile newTile = Instantiate(element.Prefab, position, Quaternion.identity, transform).GetComponent<Tile>();
-        newTile.TileType = type;
-        newTile.Position = coordinate;
-        newTile.MovePosition = position;
-        columns.Add(newTile);
-    }
-
+    
     #endregion
 
     #region Public
 
     public void SwapTile(Vector2Int lhs, Vector2Int rhs)
     {
-        Tile tile1 = Rows[lhs.y][lhs.x];
-        Tile tile2 = Rows[rhs.y][rhs.x];
+        Tile tile1 = Grid[lhs.x, lhs.y];
+        Tile tile2 = Grid[rhs.x, rhs.y];
+        
+        Sprite temp = tile1.Renderer.sprite;
+        tile1.Renderer.sprite = tile2.Renderer.sprite;
+        tile2.Renderer.sprite = temp;
 
-        if (tile1.InProgress || tile2.InProgress)
+        bool isMatches = CheckMatches();
+        if (isMatches == false)
         {
-            return;
+            // Rollback
+            temp = tile1.Renderer.sprite;
+            tile1.Renderer.sprite = tile2.Renderer.sprite;
+            tile2.Renderer.sprite = temp;
+        }
+        else
+        {
+            do
+            {
+                FillHoles();
+            } while (CheckMatches());
+        }
+    }
+
+    public bool CheckMatches()
+    {
+        HashSet<Tile> matchTiles = new HashSet<Tile>();
+
+        for (int row = 0; row < Rows; row++)
+        {
+            for (int column = 0; column < Columns; column++)
+            {
+                Tile currentTile = Grid[column, row];
+                if (currentTile == null)
+                {
+                    continue;
+                }
+
+                List<Tile> horizontalMatches = FindColumnMatchForTile(row, column, currentTile);
+                if (horizontalMatches.Count >= 2)
+                {
+                    matchTiles.UnionWith(horizontalMatches);
+                    matchTiles.Add(currentTile);
+                }
+
+                List<Tile> verticalMatches = FindRowMatchForTile(row, column, currentTile);
+                if (verticalMatches.Count >= 2)
+                {
+                    matchTiles.UnionWith(verticalMatches);
+                    matchTiles.Add(currentTile);
+                }
+            }
         }
 
-        Vector2 temp = tile1.transform.position;
-        Vector2Int positionTemp = tile1.Position;
+        foreach (Tile tile in matchTiles)
+        {
+            tile.Renderer.sprite = null;
+        }
 
-        tile1.Position = tile2.Position;
-        tile1.MovePosition = tile2.transform.position;
+        return matchTiles.Count > 0;
+    }
 
-        tile2.Position = positionTemp;
-        tile2.MovePosition = temp;
+    void FillHoles()
+    {
+        for (int column = 0; column < Rows; column++)
+        {
+            for (int row = 0; row < Columns; row++)
+            {
+                if (Grid[column, row] == null)
+                {
+                    continue;
+                }
 
-        Rows[lhs.y][lhs.x] = tile2;
-        Rows[rhs.y][rhs.x] = tile1;
+                while (GetSpriteRendererAt(column, row).sprite == null)
+                {
+                    SpriteRenderer current = GetSpriteRendererAt(column, row);
+                    SpriteRenderer next = current;
+
+                    for (int filler = row; filler < Rows - 1; filler++)
+                    {
+                        if (Grid[column, filler + 1] == null)
+                        {
+                            continue;
+                        }
+
+                        next = GetSpriteRendererAt(column, filler + 1);
+                        current.sprite = next.sprite;
+                        current = next;
+                    }
+
+                    next.sprite = FruitsList[Random.Range(0, FruitsList.Length)];
+                }
+            }
+        }
+    }
+
+    SpriteRenderer GetSpriteRendererAt(int column, int row)
+    {
+        if (column < 0 || column >= Columns || row < 0 || row >= Rows)
+            return null;
+
+        Tile tile = Grid[column, row];
+        if (tile == null)
+            return null;
+
+        return tile.Renderer;
+    }
+
+    public List<Tile> FindColumnMatchForTile(int row, int column, Tile currentTile)
+    {
+        List<Tile> matchTiles = new List<Tile>();
+
+        for (int i = column + 1; i < Columns; i++)
+        {
+            Tile nextTile = Grid[i, row];
+            if (nextTile == null)
+            {
+                continue;
+            }
+
+            if (nextTile.Renderer.sprite != currentTile.Renderer.sprite)
+            {
+                break;
+            }
+
+            matchTiles.Add(nextTile);
+        }
+
+        return matchTiles;
+    }
+
+    public List<Tile> FindRowMatchForTile(int row, int column, Tile currentTile)
+    {
+        List<Tile> matchTiles = new List<Tile>();
+
+        for (int i = row + 1; i < Rows; i++)
+        {
+            Tile nextTile = Grid[column, i];
+            if (nextTile == null)
+            {
+                continue;
+            }
+
+            if (nextTile.Renderer.sprite != currentTile.Renderer.sprite)
+            {
+                break;
+            }
+
+            matchTiles.Add(nextTile);
+        }
+
+        return matchTiles;
     }
     #endregion
 
@@ -145,9 +241,9 @@ public class GameBoard : MonoBehaviour
         Vector2 startPosition = BoardBounds.min + new Vector3(Padding.x, Padding.y, 0f);
         Vector2 position = startPosition;
 
-        for (int y = 0; y < Size.y; y++)
+        for (int y = 0; y < Rows; y++)
         {
-            for (int x = 0; x < Size.x; x++)
+            for (int x = 0; x < Columns; x++)
             {
                 Gizmos.DrawWireCube(position, FruitsBounds.size);
 
